@@ -1,7 +1,13 @@
+from dotenv import load_dotenv
 from http.server import HTTPServer, BaseHTTPRequestHandler
 # from flask import Flask, request, jsonify
 # from main import main
 import subprocess
+import os
+
+load_dotenv()
+
+# Access the variables
 
 # app = Flask(__name__)
 
@@ -13,8 +19,8 @@ import subprocess
 # if __name__ == "__main__":
 #     app.run(debug=True)
 
-HOST = "localhost"
-PORT = 9999
+HOST = os.getenv('HOST')
+PORT = os.getenv('PORT')
 
 class NeuralHTTP(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -25,7 +31,7 @@ class NeuralHTTP(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(bytes("<html><body><h1>Sending News</h1></body></html>", "utf-8"))
 
-server = HTTPServer((HOST, PORT), NeuralHTTP)
+server = HTTPServer((HOST, int(PORT)), NeuralHTTP)
 print("\n Server running on ", PORT)
 server.serve_forever()
 server.server_close()
