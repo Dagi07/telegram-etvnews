@@ -1,4 +1,5 @@
 import fcntl
+import re
 import traceback
 from telethon import TelegramClient
 from getpass import getpass
@@ -11,6 +12,7 @@ api_id = '1317311'
 api_hash = '378767fb848892b60ed62a4e962787ca'
 phone_number = '+251920722057'
 etvnews = 1460532634
+# workTalkinPupose = 1579506507
 
 # File to store the last message IDs per channel
 LAST_MESSAGE_FILE = 'last_sent_message_ids.json'
@@ -35,150 +37,112 @@ client = TelegramClient('new_session', api_id, api_hash, connection_retries=5, r
 # with client:
 #     client.loop.run_until_complete(list_channels())
 
+MAX_CAPTION_LENGTH = 1024  # Telegram's typical caption limit
+
 async def scrape_channel(channel_id):
     clean_download_folder()
     print("scrapping...", channel_id)
     try:
         async for message in client.iter_messages(int(channel_id), limit=35):
-            # print(message)
             if is_different_message(channel_id, message.id):
                 update_last_sent_message_id(channel_id, message.id)
 
                 if message.text:
                     edited_text = edit_message(message.text)
-
+                    
+                    # Check if the message includes a photo
                     if message.photo:
-                        file = await message.download_media(file=PHOTO_DOWNLOAD_PATH)
-                        await client.send_file(etvnews, file, caption=edited_text)
-                        print(f"Sent message with photo: {file}")
-                        if os.path.exists(file):
-                            os.remove(file)
-                            print(f"Deleted file: {file}")
+                        # If the message is part of a media group (album)
+                        if message.grouped_id:
+                            album_messages = []
+                            # Gather all messages in the album
+                            async for m in client.iter_messages(int(channel_id), limit=35):
+                                if m.grouped_id == message.grouped_id:
+                                    album_messages.append(m)
+                            album_messages = sorted(album_messages, key=lambda m: m.id)
+                            
+                            files = []
+                            for m in album_messages:
+                                if m.photo:
+                                    file = await m.download_media(file=PHOTO_DOWNLOAD_PATH)
+                                    files.append(file)
+                            
+                            # Decide whether to use caption with media or separate reply based on length
+                            if len(edited_text) > MAX_CAPTION_LENGTH:
+                                sent_album = await client.send_file(etvnews, files, caption="")
+                                await client.send_message(etvnews, edited_text, reply_to=sent_album[0].id)
+                                print(f"Sent album with {len(files)} photos and separate caption reply.")
+                            else:
+                                await client.send_file(etvnews, files, caption=edited_text)
+                                print(f"Sent album with {len(files)} photos and caption.")
+                        else:
+                            # Single photo case
+                            file = await message.download_media(file=PHOTO_DOWNLOAD_PATH)
+                            if len(edited_text) > MAX_CAPTION_LENGTH:
+                                sent_photo = await client.send_file(etvnews, file, caption="")
+                                await client.send_message(etvnews, edited_text, reply_to=sent_photo.id)
+                                print(f"Sent single photo and separate caption reply.")
+                            else:
+                                await client.send_file(etvnews, file, caption=edited_text)
+                                print(f"Sent single photo with caption.")
                     else:
+                        # No photo, just send the text message normally
                         await client.send_message(etvnews, edited_text)
-                        print("Sent message without photo")
+                        
     except Exception as e:
         print(f"An error occurred: {e}", message)
         traceback.print_exc()
 
-async def handle_media_message(message):
-    """Handle single or grouped media messages."""
-    media_group = []
 
-    # If part of a media group (album), fetch all messages in the group
-    if message.grouped_id:
-        async for msg in client.iter_messages(message.chat_id, message.grouped_id):
-            media_group.append(msg)
-    else:
-        media_group = [message]  # Single photo message
-
-    # Download each media item into the specified folder
-    downloaded_files = []
-    for msg in media_group:
-        file = await msg.download_media(file=PHOTO_DOWNLOAD_PATH)
-        downloaded_files.append(file)
-
-    # Send each media item and delete after sending
-    for file in downloaded_files:
-        edited_text = edit_message(message.text or "")
-        print(f"\n\nSent message with photo: {file}")
-        await client.send_file(etvnews, file, caption=edited_text)
-
-        # Delete the photo after sending
-        if os.path.exists(file):
-            os.remove(file)
-            print(f"Deleted file: {file}")
-
-async def handle_media_group(channel_id, groupedId):
-    media_files = []
-    # print("\n media files ", media_files)
-    try:
-        async for msg in client.iter_messages(channel_id, groupedId):
-            await print("\n\n ", client.iter_messages(channel_id, groupedId))
-            # print("\n msg ", msg, "\n \n grouped id ", groupedId)
-            try:
-                file = await msg.download_media(file=PHOTO_DOWNLOAD_PATH)
-                print("\n\n\n file   ", file)
-                if file:
-                    media_files.append(file)
-            except Exception as download_error:
-                print(f"Error downloading media: {download_error}")
-                continue
-
-        if media_files:
-            print("\n\n\n\n media files        ", media_files)
-            edited_text = edit_message(msg.text or "")
-            print(f"Sending media group with files: {media_files}")
-            await client.send_file(etvnews, media_files, caption=edited_text)
-
-    except Exception as e:
-        print(f"Error in handle_media_group: {e}")
-    finally:
-        # Cleanup
-        for file in media_files:
-            if os.path.exists(file):
-                try:
-                    os.remove(file)
-                    print(f"Deleted file: {file}")
-                except OSError as e:
-                    print(f"Error deleting file {file}: {e}")
-
-async def handle_single_media(message):
-    """Handle messages with a single media."""
-    file = None
-    try:
-        file = await message.download_media(file=PHOTO_DOWNLOAD_PATH)
-        if file:
-            edited_text = edit_message(message.text or "")
-            print(f"Sending single media file: {file}")
-            await client.send_file(etvnews, file, caption=edited_text)
-
-    except Exception as e:
-        print(f"Error in handle_single_media: {e}")
-    finally:
-        if file and os.path.exists(file):
-            try:
-                os.remove(file)
-                print(f"Deleted file: {file}")
-            except OSError as e:
-                print(f"Error deleting file {file}: {e}")
-
-async def send_text_message(message):
-    try:
-        edited_text = edit_message(message.text)
-        print(f"Sending text message: {edited_text}")
-        await client.send_message(etvnews, edited_text)
-    except Exception as e:
-        print(f"Error in send_text_message: {e}")
 
 def edit_message(text):
-    """Checks and removes specific unwanted elements from the text."""
-    toBeRemoved = [
-        "@tikvahethiopia", 
-        "ትክክለኛዎቹን የአሐዱ ራዲዮ የማህበራዊ ሚዲያ ገጾች በመቀላቀል ቤተሰብ ይሁኑ!", 
-        "ፌስቡክ: https://www.facebook.com/ahaduradio", 
-        "ድረ ገጽ፡- https://ahaduradio.com/", 
-        "ዩትዩብ፦ http://shorturl.at/cknFP", 
-        "ቲክቶክ ፡- www.tiktok.com/@ahadutv.official", 
-        "አስተያየት እና ጥቆማ ለመስጠት በ7545 አጭር የፅሁፍ መልክት ይላኩ"
-    ]
-
-    new_handle = (
-        "ፈጣን መረጃዎችን ለማግኘት ትክክለኛውን የቴሌግራም ቻናላችንን ይቀላቀሉ \n"
-        "https://t.me/ETVNEWS24 \n\n @etvnews24"
-    )
-
-    # Remove unwanted elements from the text
-    for remove in toBeRemoved:
-        text = text.replace(remove, "")
-
-    # Clean up any extra whitespace or newlines
+    """Removes specific unwanted elements and appends a new handle."""
+    # Map of unwanted substrings to their replacements.
+    # If the value is an empty string, it simply removes the substring.
+    removals = {
+        "@tikvahethiopia": "",
+        "ትክክለኛዎቹን የአሐዱ ራዲዮ የማህበራዊ ሚዲያ ገጾች በመቀላቀል ቤተሰብ ይሁኑ!": "",
+        "ፌስቡክ: https://www.facebook.com/ahaduradio": "",
+        "ድረ ገጽ፡- https://ahaduradio.com/": "",
+        "ዩትዩብ፦ http://shorturl.at/cknFP": "",
+        "ቲክቶክ ፡- www.tiktok.com/@ahadutv.official": "",
+        "ዋትስአፕ፦ whatsapp.com/channel/0029VajDfVZI1rcb05C5B22b": "",
+        "አስተያየት እና ጥቆማ ለመስጠት በ7545 አጭር የፅሁፍ መልክት ይላኩ": "",
+        "#አሐዱ_መድረክ": "",
+        "#አሐዱ_የኢትዮጵያውያን_ድምጽ": "",
+        "አሐዱ ሬዲዮ": "ኢቲቪ ዜና",
+        "ኤፍ ኤም ሲ": "ኢቲቪ ዜና",
+        "ቲክቫህ ኢትዮጵያ": "ኢቲቪ ዜና",
+    }
+    
+    # Create a combined regex pattern by escaping each key and joining with '|'
+    pattern = '|'.join(map(re.escape, removals.keys()))
+    # Replace each unwanted substring with its corresponding replacement
+    # This single call scans the text and substitutes any matching substring.
+    text = re.sub(pattern, lambda m: removals[m.group(0)], text)
+    
+    # Remove custom words (like #TikvahEthiopiaFamily variants)
+    text = remove_custom_words(text)
+    
+    # Clean up extra whitespace/newlines
     cleaned_text = text.strip()
-
-    # Append the new handle at the end
+    
+    new_handle = (
+        "**ፈጣን መረጃዎችን ለማግኘት ትክክለኛውን የቴሌግራም ቻናላችንን ይቀላቀሉ** \n"
+        "**https://t.me/ETVNEWS24** \n\n @etvnews24"
+    )
+    
     return f"{cleaned_text}\n\n{new_handle}" if cleaned_text else new_handle
 
 
+def remove_custom_words(text):
+    # Combine all patterns into a single regular expression
+    combined_pattern = r'#TikvahEthiopiaFamily\w*|anotherPattern|yetAnotherPattern'
+    # Use re.sub to replace all patterns with an empty string
+    cleaned_text = re.sub(combined_pattern, '', text)
+    return cleaned_text
+
+    
 def is_different_message(channel_id, new_message_id):
     """Check if the message is different from the last one sent."""
     if os.path.exists(LAST_MESSAGE_FILE):
@@ -226,7 +190,8 @@ def acquire_lock():
 async def main():
     addisWalta = 1151106565
     ahadu = 1292605662
-    channels = [1130580549, 1236564438, 1151106565, 1292605662]  # Add your channel IDs here
+    
+    channels = [1130580549, 1236564438, addisWalta, ahadu]  # Add your channel IDs here
 
     # lock = acquire_lock()
     # if not lock:

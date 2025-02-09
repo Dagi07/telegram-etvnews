@@ -21,7 +21,6 @@ load_dotenv()
 
 HOST = os.getenv('HOST')
 PORT = os.getenv('PORT')
-
 class NeuralHTTP(BaseHTTPRequestHandler):
     def do_GET(self):
         print("\n request came \n")
