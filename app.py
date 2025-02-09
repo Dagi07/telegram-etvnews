@@ -13,7 +13,7 @@ class NeuralHTTP(BaseHTTPRequestHandler):
         print("\nRequest came for:", self.path, "\n")
         if self.path == '/run-script':
             # Execute the cronJob.sh script when the URL is /run-script
-            subprocess.Popen(["bash", "cronJob.sh"])
+            subprocess.Popen(["bash", "static/cronJob.sh"])
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.end_headers()
