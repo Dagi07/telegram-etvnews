@@ -10,6 +10,3 @@ echo "Sleeping for $sleep_time seconds..." >> ./logfile.log
 
 # Sleep for the random duration
 sleep $sleep_time
-
-# Proceed with the rest of your script
-# Your main script commands go here
