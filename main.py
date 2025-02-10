@@ -11,8 +11,8 @@ import shutil
 api_id = '1317311'
 api_hash = '378767fb848892b60ed62a4e962787ca'
 phone_number = '+251920722057'
-# etvnews = 1460532634
-workTalkinPupose = 1579506507
+etvnews = 1460532634
+# workTalkinPupose = 1579506507
 
 # File to store the last message IDs per channel
 LAST_MESSAGE_FILE = 'last_sent_message_ids.json'
@@ -69,25 +69,25 @@ async def scrape_channel(channel_id):
                             
                             # Decide whether to use caption with media or separate reply based on length
                             if len(edited_text) > MAX_CAPTION_LENGTH:
-                                sent_album = await client.send_file(workTalkinPupose, files, caption="")
-                                await client.send_message(workTalkinPupose, edited_text, reply_to=sent_album[0].id)
+                                sent_album = await client.send_file(etvnews, files, caption="")
+                                await client.send_message(etvnews, edited_text, reply_to=sent_album[0].id)
                                 print(f"Sent album with {len(files)} photos and separate caption reply.")
                             else:
-                                await client.send_file(workTalkinPupose, files, caption=edited_text)
+                                await client.send_file(etvnews, files, caption=edited_text)
                                 print(f"Sent album with {len(files)} photos and caption.")
                         else:
                             # Single photo case
                             file = await message.download_media(file=PHOTO_DOWNLOAD_PATH)
                             if len(edited_text) > MAX_CAPTION_LENGTH:
-                                sent_photo = await client.send_file(workTalkinPupose, file, caption="")
-                                await client.send_message(workTalkinPupose, edited_text, reply_to=sent_photo.id)
+                                sent_photo = await client.send_file(etvnews, file, caption="")
+                                await client.send_message(etvnews, edited_text, reply_to=sent_photo.id)
                                 print(f"Sent single photo and separate caption reply.")
                             else:
-                                await client.send_file(workTalkinPupose, file, caption=edited_text)
+                                await client.send_file(etvnews, file, caption=edited_text)
                                 print(f"Sent single photo with caption.")
                     else:
                         # No photo, just send the text message normally
-                        await client.send_message(workTalkinPupose, edited_text)
+                        await client.send_message(etvnews, edited_text)
                         
     except Exception as e:
         print(f"An error occurred: {e}", message)
