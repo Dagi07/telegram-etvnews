@@ -1,0 +1,5 @@
+/__pycache__
+/my_venv
+# .gitignore
+.env
+last_sent_message_ids.json
