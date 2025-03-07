@@ -11,9 +11,9 @@ import shutil
 api_id = '1317311'
 api_hash = '378767fb848892b60ed62a4e962787ca'
 phone_number = '+251920722057'
-# etvnews = 1460532634
-workTalkinPupose = 1579506507
-send_to_chat = workTalkinPupose
+etvnews = 1460532634
+# workTalkinPupose = 1579506507
+send_to_chat = etvnews
 
 # File to store the last message IDs per channel
 LAST_MESSAGE_FILE = 'last_sent_message_ids.json'
