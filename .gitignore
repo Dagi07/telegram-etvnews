@@ -3,3 +3,4 @@
 # .gitignore
 .env
 last_sent_message_ids.json
+.venv
